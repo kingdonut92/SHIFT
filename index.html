@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SHIFT</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f0ede8;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh;
+    font-family: 'DM Mono', monospace;
+    user-select: none;
+  }
+
+  /* ── Overlay ── */
+  #overlay {
+    position: fixed; inset: 0; background: #f0ede8;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100; transition: opacity 0.6s; cursor: pointer;
+  }
+  #overlay h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 110px; letter-spacing: 0.25em; color: #111; line-height: 1;
+    margin-right: -0.25em;
+  }
+  #overlay .sub { font-size: 11px; letter-spacing: 0.3em; color: #bbb; margin-top: 6px; text-transform: uppercase; }
+
+  /* ── Wrapper ── */
+  #wrapper { display: flex; flex-direction: column; align-items: center; }
+
+  #topbar {
+    width: 860px; display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 0 8px 0;
+  }
+  .title-sm { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 0.2em; color: #111; }
+  .meta { font-size: 10px; color: #bbb; letter-spacing: 0.1em; line-height: 1.9; text-align: right; }
+  .meta strong { color: #111; }
+
+  #gameCanvas { display: block; cursor: crosshair; }
+
+  /* ── Play statusbar ── */
+  #statusbar {
+    width: 860px; display: flex; align-items: center; justify-content: space-between;
+    border: 2px solid #111; border-top: 2px solid #111;
+    padding: 8px 14px; font-size: 10px; color: #bbb; letter-spacing: 0.1em;
+  }
+  #statusbar.edit-mode { border-color: #e63030; background: #fff8f8; }
+  #statusbar .rkey { font-size: 9px; color: #ccc; }
+  #statusbar .rkey kbd {
+    background: #fff; border: 1px solid #ddd; border-radius: 2px;
+    padding: 1px 5px; font-family: 'DM Mono', monospace; font-size: 9px; color: #888;
+  }
+  .edit-badge {
+    font-size: 10px; letter-spacing: 0.15em; color: #e63030; font-weight: 500;
+    display: none;
+  }
+  #statusbar.edit-mode .edit-badge { display: inline; }
+  #statusbar.edit-mode .play-hint  { display: none; }
+
+  /* ── Editor toolbar ── */
+  #editor-toolbar {
+    display: none;
+    width: 860px;
+    border: 2px solid #e63030; border-top: none;
+    background: #fff;
+  }
+  #editor-toolbar.visible { display: block; }
+
+  .toolbar-row {
+    display: flex; align-items: stretch;
+    border-bottom: 1px solid #f0ede8;
+  }
+  .toolbar-row:last-child { border-bottom: none; }
+
+  .tb-section {
+    display: flex; align-items: center; gap: 0;
+    border-right: 1px solid #eee;
+    padding: 0;
+  }
+  .tb-section:last-child { border-right: none; }
+  .tb-label {
+    font-size: 9px; letter-spacing: 0.12em; color: #bbb;
+    padding: 0 10px; white-space: nowrap; border-right: 1px solid #eee;
+    display: flex; align-items: center;
+  }
+
+  .tb-btn {
+    background: none; border: none; border-right: 1px solid #eee;
+    font-family: 'DM Mono', monospace; font-size: 10px; color: #555;
+    padding: 9px 14px; cursor: pointer; white-space: nowrap;
+    transition: background 0.1s, color 0.1s;
+    letter-spacing: 0.05em;
+  }
+  .tb-btn:last-child { border-right: none; }
+  .tb-btn:hover { background: #f8f8f8; }
+  .tb-btn.active { background: #111; color: #fff; }
+  .tb-btn.red-active { background: #e63030; color: #fff; }
+  .tb-btn.green-active { background: #2d7a3a; color: #fff; }
+
+  .tb-sep { width: 1px; background: #eee; align-self: stretch; }
+
+  /* level manager panel */
+  #level-panel {
+    width: 860px; border: 2px solid #e63030; border-top: none;
+    background: #fff; display: none; padding: 12px 14px;
+    gap: 8px; flex-wrap: wrap;
+  }
+  #level-panel.visible { display: flex; }
+  .level-slot {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid #ddd; padding: 6px 10px;
+    font-size: 10px; color: #555; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .level-slot:hover { border-color: #111; }
+  .level-slot.active-slot { border-color: #e63030; color: #e63030; }
+  .level-slot .slot-del {
+    font-size: 10px; color: #ccc; cursor: pointer; margin-left: 4px;
+  }
+  .level-slot .slot-del:hover { color: #e63030; }
+  #new-level-btn {
+    border: 1px dashed #ccc; padding: 6px 14px;
+    font-size: 10px; color: #bbb; cursor: pointer; background: none;
+    font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
+  }
+  #new-level-btn:hover { border-color: #111; color: #111; }
+
+  /* ── Context menu ── */
+  #ctx-menu {
+    position: fixed; display: none;
+    background: #fff; border: 1px solid #ddd;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    z-index: 200; min-width: 148px;
+    font-family: 'DM Mono', monospace;
+  }
+  #ctx-menu.visible { display: block; }
+  .ctx-label {
+    padding: 7px 14px 5px; font-size: 9px; letter-spacing: 0.12em;
+    color: #bbb; border-bottom: 1px solid #f0ede8; text-transform: uppercase;
+  }
+  .ctx-item {
+    padding: 9px 14px; font-size: 11px; letter-spacing: 0.04em;
+    color: #333; cursor: pointer; display: flex; align-items: center; gap: 9px;
+    border-bottom: 1px solid #f5f3f0;
+  }
+  .ctx-item:last-child { border-bottom: none; }
+  .ctx-item:hover { background: #f8f7f5; }
+  .ctx-item.danger { color: #e63030; }
+  .ctx-item.danger:hover { background: #fff5f5; }
+</style>
+</head>
+<body>
+
+<!-- Context menu -->
+<div id="ctx-menu">
+  <div class="ctx-label" id="ctx-title">PLATFORM</div>
+  <div class="ctx-item" id="ctx-dup" onclick="ctxDuplicate()">⧉ &nbsp;Duplicate</div>
+  <div class="ctx-item danger" id="ctx-del" onclick="ctxDelete()">✕ &nbsp;Delete</div>
+</div>
+
+<div id="overlay" onclick="startGame()">
+  <h1>SHIFT</h1>
+  <div class="sub">click to play</div>
+</div>
+
+<div id="wrapper">
+  <div id="topbar">
+    <div class="title-sm">SHIFT</div>
+    <div class="meta">
+      LEVEL <strong id="lvlNum">—</strong>
+      &nbsp;·&nbsp;
+      <strong id="shapeLabel">—</strong>
+      &nbsp;·&nbsp;
+      DOOR: <strong id="doorLabel">—</strong>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas" width="860" height="500"></canvas>
+
+  <div id="statusbar">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="edit-badge">EDIT MODE</span>
+      <span class="play-hint rkey"><kbd>E</kbd> editor</span>
+    </div>
+    <div class="rkey play-hint"><kbd>R</kbd> restart</div>
+    <div class="rkey" style="display:none" id="edit-hint-bar">
+      <kbd>E</kbd> play &nbsp; <kbd>G</kbd> grid snap &nbsp; <kbd>Del</kbd> delete hovered
+    </div>
+  </div>
+
+  <!-- Editor toolbar (visible in edit mode) -->
+  <div id="editor-toolbar">
+    <div class="toolbar-row">
+      <div class="tb-section">
+        <span class="tb-label">TOOL</span>
+        <button class="tb-btn" id="tool-select"       onclick="setTool('select')">↖ SELECT</button>
+        <button class="tb-btn active" id="tool-platform" onclick="setTool('platform')">▬ PLATFORM</button>
+        <button class="tb-btn" id="tool-orb-square"   onclick="setTool('orb-square')">● SQ ORB</button>
+        <button class="tb-btn" id="tool-orb-triangle" onclick="setTool('orb-triangle')">● TRI ORB</button>
+        <button class="tb-btn" id="tool-orb-circle"   onclick="setTool('orb-circle')">● CIR ORB</button>
+        <button class="tb-btn" id="tool-door"         onclick="setTool('door')">▭ DOOR</button>
+        <button class="tb-btn" id="tool-start"        onclick="setTool('start')">◆ START</button>
+        <button class="tb-btn" id="tool-delete"       onclick="setTool('delete')">✕ DELETE</button>
+      </div>
+    </div>
+    <div class="toolbar-row">
+      <div class="tb-section">
+        <span class="tb-label">DOOR</span>
+        <button class="tb-btn active" id="door-sq"  onclick="setDoorShape('square')">SQ</button>
+        <button class="tb-btn" id="door-tri" onclick="setDoorShape('triangle')">TRI</button>
+        <button class="tb-btn" id="door-cir" onclick="setDoorShape('circle')">CIR</button>
+      </div>
+      <div class="tb-section">
+        <span class="tb-label">START</span>
+        <button class="tb-btn active" id="start-sq"  onclick="setStartShape('square')">SQ</button>
+        <button class="tb-btn" id="start-tri" onclick="setStartShape('triangle')">TRI</button>
+        <button class="tb-btn" id="start-cir" onclick="setStartShape('circle')">CIR</button>
+      </div>
+      <div class="tb-section">
+        <span class="tb-label">GRID</span>
+        <button class="tb-btn" id="grid-btn" onclick="toggleGrid()">OFF</button>
+      </div>
+      <div class="tb-section" style="margin-left:auto">
+        <button class="tb-btn" onclick="clearLevel()" style="color:#e63030">✕ CLEAR</button>
+        <button class="tb-btn" onclick="testLevel()" style="color:#2d8a45">▶ TEST</button>
+        <button class="tb-btn" onclick="saveLevel()" style="color:#2a6496">↓ SAVE</button>
+        <button class="tb-btn" onclick="exportLevel()" style="color:#888">{ } EXPORT</button>
+        <button class="tb-btn" onclick="toggleLevelPanel()">≡ LEVELS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Level slots panel -->
+  <div id="level-panel">
+    <button id="new-level-btn" onclick="newLevel()">+ NEW LEVEL</button>
+  </div>
+</div>
+
+<!-- Export modal -->
+<div id="export-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#fff;border:2px solid #111;padding:20px;width:540px;font-family:'DM Mono',monospace;">
+    <div style="font-size:11px;letter-spacing:0.15em;color:#111;margin-bottom:10px;">LEVEL JSON — copy and paste to Claude</div>
+    <textarea id="export-ta" style="width:100%;height:220px;font-size:9px;border:1px solid #ddd;padding:8px;resize:none;font-family:'DM Mono',monospace;" readonly></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button onclick="copyExport()" style="flex:1;padding:8px;background:#111;color:#fff;border:none;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:0.1em;">COPY</button>
+      <button onclick="closeExport()" style="padding:8px 16px;background:none;border:1px solid #ccc;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;color:#888;">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const GRAVITY     = 0.52;
+const JUMP_VY     = -13;
+const SPEED       = 4.4;
+const CLING_SPEED = 3.0;
+const FLOAT_FORCE = -0.38;
+const TUNNEL_H    = 106;
+
+// ─── COLORS ──────────────────────────────────────────────────────────────────
+const C = {
+  bg: '#ffffff', plat: '#111111',
+  sq: '#2d7a3a', tri: '#c05a1f', circ: '#2a6496',
+  good: '#2d8a45', bad: '#c0392b',
+};
+
+// ─── LEVEL STORE ─────────────────────────────────────────────────────────────
+let savedLevels = [];
+let activeLevelIdx = 0;
+
+function loadLevelsFromStorage() {
+  try {
+    const raw = localStorage.getItem('shift_levels');
+    if (raw) savedLevels = JSON.parse(raw);
+  } catch(e) { savedLevels = []; }
+}
+
+function saveLevelsToStorage() {
+  localStorage.setItem('shift_levels', JSON.stringify(savedLevels));
+}
+
+// ─── LEVEL 1 (hardcoded) ─────────────────────────────────────────────────────
+let LEVEL = {
+  "name": "Level 1",
+  "playerStart": { "x": 46, "y": 431 },
+  "playerShape": "square",
+  "doorPos": { "x": 812, "y": 189 },
+  "doorShape": "circle",
+  "platforms": [
+    { "x": 0,   "y": 0,   "w": 860, "h": 18  },
+    { "x": 0,   "y": 18,  "w": 18,  "h": 88  },
+    { "x": 842, "y": 18,  "w": 18,  "h": 88  },
+    { "x": 0,   "y": 88,  "w": 285, "h": 18  },
+    { "x": 345, "y": 88,  "w": 330, "h": 18  },
+    { "x": 730, "y": 88,  "w": 130, "h": 18  },
+    { "x": 0,   "y": 179, "w": 18,  "h": 285 },
+    { "x": 277, "y": 386, "w": 60,  "h": 14  },
+    { "x": 474, "y": 260, "w": 60,  "h": 14  },
+    { "x": 842, "y": 106, "w": 18,  "h": 394 },
+    { "x": 663, "y": 227, "w": 186, "h": 45  },
+    { "x": 0,   "y": 463, "w": 123, "h": 37  },
+    { "x": 655, "y": 102, "w": 20,  "h": 170 },
+    { "x": 1,   "y": 84,  "w": 17,  "h": 97  },
+    { "x": 786, "y": 486, "w": 60,  "h": 14  },
+    { "x": 728, "y": 486, "w": 60,  "h": 14  }
+  ],
+  "orbs": [
+    { "x": 314, "y": 194, "shape": "triangle" },
+    { "x": 790, "y": 461, "shape": "circle"   },
+    { "x": 635, "y": 135, "shape": "square"   }
+  ]
+};
+
+function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+// ─── GAME STATE ──────────────────────────────────────────────────────────────
+let player, orbs, door;
+let keys   = {};
+let t      = 0;
+let phase  = 'idle';
+let phaseT = 0;
+let flash  = null;
+let appMode = 'play'; // 'play' | 'edit'
+
+// ─── LOAD / PLAY ─────────────────────────────────────────────────────────────
+function load() {
+  player = {
+    x: LEVEL.playerStart.x, y: LEVEL.playerStart.y,
+    w: 24, h: 24, vx: 0, vy: 0, onGround: false,
+    clinging: false, clingSide: null, clingPlatIdx: -1,
+    shape: LEVEL.playerShape,
+  };
+  orbs  = LEVEL.orbs.map(o => ({ ...o, collected: false }));
+  door  = { ...LEVEL.doorPos, w: 30, h: 38, shape: LEVEL.doorShape };
+  phase = 'playing'; phaseT = 0; flash = null;
+  refreshHUD();
+}
+
+function refreshHUD() {
+  document.getElementById('shapeLabel').textContent = player ? player.shape.toUpperCase() : '—';
+  document.getElementById('doorLabel').textContent  = door  ? door.shape.toUpperCase()   : '—';
+}
+
+// ─── PHYSICS ─────────────────────────────────────────────────────────────────
+function tick() {
+  const pw = player.w, ph = player.h;
+  const shiftHeld = keys['ShiftLeft'] || keys['ShiftRight'];
+  const isSquare  = player.shape === 'square';
+
+  let newCling = false, newSide = null, newPlatIdx = -1;
+  if (isSquare && shiftHeld) {
+    const probe = 3;
+    for (let i = 0; i < LEVEL.platforms.length; i++) {
+      const p = LEVEL.platforms[i];
+      if (player.x+pw >= p.x-probe && player.x+pw <= p.x+probe &&
+          player.y+ph > p.y+2 && player.y < p.y+p.h-2)
+        { newCling=true; newSide='right'; newPlatIdx=i; break; }
+      if (player.x <= p.x+p.w+probe && player.x >= p.x+p.w-probe &&
+          player.y+ph > p.y+2 && player.y < p.y+p.h-2)
+        { newCling=true; newSide='left'; newPlatIdx=i; break; }
+      if (player.y <= p.y+p.h+probe && player.y >= p.y+p.h-probe &&
+          player.x+pw > p.x+2 && player.x < p.x+p.w-2)
+        { newCling=true; newSide='top'; newPlatIdx=i; break; }
+    }
+  }
+  player.clinging=newCling; player.clingSide=newSide; player.clingPlatIdx=newPlatIdx;
+
+  if (player.clinging) {
+    const side = player.clingSide;
+    player.vx=0; player.vy=0;
+    if (side==='right'||side==='left') {
+      if (keys['ArrowUp']  ||keys['KeyW']) player.vy=-CLING_SPEED;
+      if (keys['ArrowDown']||keys['KeyS']) player.vy= CLING_SPEED;
+      const p=LEVEL.platforms[newPlatIdx];
+      if (side==='right') player.x=p.x-pw; else player.x=p.x+p.w;
+    }
+    if (side==='top') {
+      if (keys['ArrowLeft'] ||keys['KeyA']) player.vx=-CLING_SPEED;
+      if (keys['ArrowRight']||keys['KeyD']) player.vx= CLING_SPEED;
+      const p=LEVEL.platforms[newPlatIdx];
+      player.y=p.y+p.h;
+    }
+    player.x+=player.vx; player.y+=player.vy;
+    player.x=Math.max(0,Math.min(W-pw,player.x));
+    player.y=Math.max(0,Math.min(H-ph,player.y));
+    if (player.y>H+80) return 'fell';
+    return null;
+  }
+
+  player.vx=0;
+  if (keys['ArrowLeft'] ||keys['KeyA']) player.vx=-SPEED;
+  if (keys['ArrowRight']||keys['KeyD']) player.vx= SPEED;
+
+  if (player.shape==='circle') {
+    let f=FLOAT_FORCE;
+    if (keys['ArrowDown']||keys['KeyS']) f= 0.52;
+    if (keys['ArrowUp']  ||keys['KeyW']) f=-0.58;
+    player.vy+=f; player.vy*=0.85;
+  } else { player.vy+=GRAVITY; }
+
+  player.vy=Math.max(-16,Math.min(18,player.vy));
+  player.x+=player.vx; player.y+=player.vy;
+  player.onGround=false;
+
+  for (const p of LEVEL.platforms) {
+    if (player.x<p.x+p.w && player.x+pw>p.x && player.y<p.y+p.h && player.y+ph>p.y) {
+      const ol=player.x+pw-p.x, or_=p.x+p.w-player.x;
+      const ot=player.y+ph-p.y, ob=p.y+p.h-player.y;
+      const minH=Math.min(ol,or_), minV=Math.min(ot,ob);
+      if (minV<=minH) {
+        if (ot<ob) { player.y=p.y-ph; player.vy=0; player.onGround=true; }
+        else { player.y=p.y+p.h; if (player.shape!=='circle') player.vy=Math.max(0,player.vy); else player.vy=0; }
+      } else {
+        if (ol<or_) player.x=p.x-pw; else player.x=p.x+p.w; player.vx=0;
+      }
+    }
+  }
+  player.x=Math.max(0,Math.min(W-pw,player.x));
+  if (player.y<0) { player.y=0; player.vy=0; }
+  if (player.y>H+80) return 'fell';
+  return null;
+}
+
+function checkOrbs() {
+  for (const o of orbs) {
+    if (o.collected) continue;
+    if (Math.hypot((player.x+player.w/2)-o.x,(player.y+player.h/2)-o.y)<22) {
+      o.collected=true; player.shape=o.shape; player.clinging=false; player.vy=0;
+      setFlash('→ '+o.shape.toUpperCase(),70,true); refreshHUD();
+    }
+  }
+}
+
+function checkDoor() {
+  if (player.x<door.x+door.w && player.x+player.w>door.x &&
+      player.y<door.y+door.h && player.y+player.h>door.y) {
+    if (player.shape===door.shape) {
+      phase='winning'; phaseT=90; setFlash('CLEAR',90,true);
+    } else {
+      const cx=player.x+player.w/2;
+      if (cx<door.x+door.w/2) player.x=door.x-player.w-1; else player.x=door.x+door.w+1;
+      player.vx=0; setFlash('WRONG SHAPE',44,false);
+    }
+  }
+}
+
+function setFlash(msg,dur,good) { flash={msg,timer:dur,max:dur,good}; }
+
+// ─── EDITOR STATE ─────────────────────────────────────────────────────────────
+let edTool       = 'select';   // default to select
+let edDoorShape  = 'square';
+let edStartShape = 'square';
+let edGrid       = false;
+let edGridSize   = 10;
+
+// Platform drawing drag state
+let dragStart    = null;
+let dragRect     = null;
+
+// Hover for delete highlight
+let hoverPlat    = -1;
+let hoverOrb     = -1;
+let hoverDoor    = false;
+let hoverStart   = false;
+
+// ── Select tool state ──
+let selType      = null;   // 'plat' | 'orb' | 'door' | 'start' | null
+let selIdx       = -1;     // index for plat/orb
+let selDragging  = false;
+let selOffX      = 0;      // click offset within item
+let selOffY      = 0;
+
+let mousePos     = {x:0, y:0};
+
+function snap(v) { return edGrid ? Math.round(v/edGridSize)*edGridSize : v; }
+
+function setTool(t) {
+  edTool = t;
+  // Clear selection when switching away from select
+  if (t !== 'select') { selType=null; selIdx=-1; selDragging=false; }
+  document.querySelectorAll('.tb-btn[id^="tool-"]').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('tool-'+t);
+  if (el) el.classList.add('active');
+  canvas.style.cursor = t==='delete' ? 'not-allowed' : t==='select' ? 'default' : 'crosshair';
+}
+
+function setDoorShape(s) {
+  edDoorShape = s;
+  LEVEL.doorShape = s;
+  const suffix = s === 'square' ? 'sq' : s === 'triangle' ? 'tri' : 'cir';
+  document.querySelectorAll('[id^="door-"]').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('door-' + suffix);
+  if (el) el.classList.add('active');
+}
+
+function setStartShape(s) {
+  edStartShape = s;
+  LEVEL.playerShape = s;
+  const suffix = s === 'square' ? 'sq' : s === 'triangle' ? 'tri' : 'cir';
+  document.querySelectorAll('[id^="start-"]').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('start-' + suffix);
+  if (el) el.classList.add('active');
+}
+
+function toggleGrid() {
+  edGrid = !edGrid;
+  document.getElementById('grid-btn').textContent = edGrid ? 'SNAP ON' : 'SNAP OFF';
+  document.getElementById('grid-btn').classList.toggle('active', edGrid);
+}
+
+function clearLevel() {
+  if (!confirm('Clear all platforms, orbs, and door?')) return;
+  LEVEL.platforms = [];
+  LEVEL.orbs      = [];
+  LEVEL.doorPos   = { x:400, y:200 };
+}
+
+function testLevel() {
+  enterPlayMode();
+  load();
+}
+
+function toggleLevelPanel() {
+  const p = document.getElementById('level-panel');
+  p.classList.toggle('visible');
+  if (p.classList.contains('visible')) renderLevelPanel();
+}
+
+// ─── SAVE / LOAD LEVELS ──────────────────────────────────────────────────────
+function saveLevel() {
+  const num = savedLevels.length + 1;
+  const name = `Level ${num}`;
+  const lv   = deepClone(LEVEL);
+  lv.name    = name;
+  savedLevels.push(lv);
+  saveLevelsToStorage();
+  activeLevelIdx = savedLevels.length - 1;
+  document.getElementById('lvlNum').textContent = activeLevelIdx + 1;
+  renderLevelPanel();
+  document.getElementById('level-panel').classList.add('visible');
+  setFlash('SAVED: ' + name, 80, true);
+}
+
+function exportLevel() {
+  const modal = document.getElementById('export-modal');
+  const ta    = document.getElementById('export-ta');
+  ta.value = JSON.stringify(LEVEL, null, 2);
+  modal.style.display = 'flex';
+  setTimeout(() => { ta.select(); }, 50);
+}
+
+function copyExport() {
+  const ta = document.getElementById('export-ta');
+  ta.select();
+  document.execCommand('copy');
+  const btn = document.querySelector('#export-modal button');
+  btn.textContent = 'COPIED!';
+  setTimeout(() => { btn.textContent = 'COPY'; }, 1500);
+}
+
+function closeExport() {
+  document.getElementById('export-modal').style.display = 'none';
+}
+
+function newLevel() {
+  LEVEL = {
+    name: 'New Level',
+    playerStart: { x:50, y:415 },
+    playerShape: 'square',
+    doorPos:     { x:400, y:200 },
+    doorShape:   'circle',
+    platforms:   [],
+    orbs:        [],
+  };
+  activeLevelIdx = -1;
+  document.getElementById('lvlNum').textContent = '—';
+  setDoorShape('circle');
+  setStartShape('square');
+}
+
+function loadSavedLevel(idx) {
+  LEVEL = deepClone(savedLevels[idx]);
+  activeLevelIdx = idx;
+  document.getElementById('lvlNum').textContent = idx + 1;
+  setDoorShape(LEVEL.doorShape);
+  setStartShape(LEVEL.playerShape);
+  renderLevelPanel();
+}
+
+function renderLevelPanel() {
+  const panel = document.getElementById('level-panel');
+  panel.innerHTML = '';
+
+  savedLevels.forEach((lv, i) => {
+    const idx = i; // capture for closure
+    const slot = document.createElement('div');
+    slot.className = 'level-slot' + (activeLevelIdx === idx ? ' active-slot' : '');
+
+    const label = document.createElement('span');
+    label.textContent = lv.name;
+
+    const del = document.createElement('span');
+    del.className = 'slot-del';
+    del.textContent = '✕';
+    del.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!confirm('Delete ' + savedLevels[idx].name + '?')) return;
+      savedLevels.splice(idx, 1);
+      savedLevels.forEach((l, j) => { l.name = `Level ${j + 1}`; });
+      saveLevelsToStorage();
+      if (activeLevelIdx >= savedLevels.length) activeLevelIdx = savedLevels.length - 1;
+      renderLevelPanel();
+    });
+
+    slot.appendChild(label);
+    slot.appendChild(del);
+    slot.addEventListener('click', () => loadSavedLevel(idx));
+    panel.appendChild(slot);
+  });
+
+  const nb = document.createElement('button');
+  nb.id = 'new-level-btn';
+  nb.textContent = '+ NEW LEVEL';
+  nb.onclick = newLevel;
+  panel.appendChild(nb);
+}
+
+// ─── MODE SWITCHING ──────────────────────────────────────────────────────────
+function enterEditMode() {
+  appMode = 'edit';
+  phase   = 'idle';
+  document.getElementById('statusbar').classList.add('edit-mode');
+  document.getElementById('editor-toolbar').classList.add('visible');
+  document.getElementById('edit-hint-bar').style.display = 'inline';
+  document.querySelector('.play-hint').style.display = 'none';
+  setTool('select');
+}
+
+function enterPlayMode() {
+  appMode = 'play';
+  document.getElementById('statusbar').classList.remove('edit-mode');
+  document.getElementById('editor-toolbar').classList.remove('visible');
+  document.getElementById('level-panel').classList.remove('visible');
+  document.getElementById('edit-hint-bar').style.display = 'none';
+  document.querySelector('.play-hint').style.display = 'inline';
+  canvas.style.cursor = 'default';
+  load();
+}
+
+// ─── EDITOR MOUSE ────────────────────────────────────────────────────────────
+function canvasXY(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function updateHover(pos) {
+  hoverPlat  = -1; hoverOrb = -1; hoverDoor = false; hoverStart = false;
+  const px=pos.x, py=pos.y;
+
+  // Check door
+  if (LEVEL.doorPos && px>=LEVEL.doorPos.x && px<=LEVEL.doorPos.x+30 &&
+      py>=LEVEL.doorPos.y && py<=LEVEL.doorPos.y+38) { hoverDoor=true; return; }
+
+  // Check player start
+  const sp=LEVEL.playerStart;
+  if (sp && Math.hypot(px-sp.x,py-sp.y)<16) { hoverStart=true; return; }
+
+  // Check orbs
+  for (let i=0; i<LEVEL.orbs.length; i++) {
+    const o=LEVEL.orbs[i];
+    if (Math.hypot(px-o.x,py-o.y)<14) { hoverOrb=i; return; }
+  }
+
+  // Check platforms
+  for (let i=LEVEL.platforms.length-1; i>=0; i--) {
+    const p=LEVEL.platforms[i];
+    if (px>=p.x && px<=p.x+p.w && py>=p.y && py<=p.y+p.h) { hoverPlat=i; return; }
+  }
+}
+
+canvas.addEventListener('mousemove', e => {
+  const pos = canvasXY(e);
+  mousePos  = pos;
+  if (appMode !== 'edit') return;
+
+  // ── Select: drag selected item ──
+  if (edTool === 'select' && selDragging && selType) {
+    const nx = snap(pos.x - selOffX);
+    const ny = snap(pos.y - selOffY);
+    if (selType === 'plat') {
+      LEVEL.platforms[selIdx].x = Math.max(0, Math.min(W - LEVEL.platforms[selIdx].w, nx));
+      LEVEL.platforms[selIdx].y = Math.max(0, Math.min(H - LEVEL.platforms[selIdx].h, ny));
+    } else if (selType === 'orb') {
+      LEVEL.orbs[selIdx].x = Math.max(0, Math.min(W, nx));
+      LEVEL.orbs[selIdx].y = Math.max(0, Math.min(H, ny));
+    } else if (selType === 'door') {
+      LEVEL.doorPos.x = Math.max(0, Math.min(W - 30, nx));
+      LEVEL.doorPos.y = Math.max(0, Math.min(H - 38, ny));
+    } else if (selType === 'start') {
+      LEVEL.playerStart.x = Math.max(0, Math.min(W - 24, nx));
+      LEVEL.playerStart.y = Math.max(0, Math.min(H - 24, ny));
+    }
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  // ── Platform draw drag ──
+  if (dragStart && edTool === 'platform') {
+    const sx=snap(Math.min(dragStart.x,pos.x)), sy=snap(Math.min(dragStart.y,pos.y));
+    const ex=snap(Math.max(dragStart.x,pos.x)), ey=snap(Math.max(dragStart.y,pos.y));
+    dragRect = { x:sx, y:sy, w:Math.max(4,ex-sx), h:Math.max(4,ey-sy) };
+  }
+
+  updateHover(pos);
+
+  // Update cursor for select tool based on what's hovered
+  if (edTool === 'select') {
+    canvas.style.cursor = (hoverPlat>=0||hoverOrb>=0||hoverDoor||hoverStart) ? 'grab' : 'default';
+  }
+});
+
+canvas.addEventListener('mousedown', e => {
+  if (appMode !== 'edit') return;
+  if (e.button !== 0) return;
+  const pos = canvasXY(e);
+
+  // ── Select tool: pick up item ──
+  if (edTool === 'select') {
+    updateHover(pos);
+    selDragging = false;
+    selType = null; selIdx = -1;
+
+    if (hoverDoor) {
+      selType = 'door'; selDragging = true;
+      selOffX = pos.x - LEVEL.doorPos.x;
+      selOffY = pos.y - LEVEL.doorPos.y;
+    } else if (hoverStart) {
+      selType = 'start'; selDragging = true;
+      selOffX = pos.x - LEVEL.playerStart.x;
+      selOffY = pos.y - LEVEL.playerStart.y;
+    } else if (hoverOrb >= 0) {
+      selType = 'orb'; selIdx = hoverOrb; selDragging = true;
+      selOffX = pos.x - LEVEL.orbs[hoverOrb].x;
+      selOffY = pos.y - LEVEL.orbs[hoverOrb].y;
+    } else if (hoverPlat >= 0) {
+      selType = 'plat'; selIdx = hoverPlat; selDragging = true;
+      selOffX = pos.x - LEVEL.platforms[hoverPlat].x;
+      selOffY = pos.y - LEVEL.platforms[hoverPlat].y;
+    }
+    canvas.style.cursor = selDragging ? 'grabbing' : 'default';
+    return;
+  }
+
+  if (edTool === 'platform') {
+    dragStart = { x: snap(pos.x), y: snap(pos.y) };
+    dragRect  = null;
+    return;
+  }
+
+  if (edTool === 'delete') {
+    updateHover(pos);
+    if (hoverPlat  >= 0) { LEVEL.platforms.splice(hoverPlat,1); hoverPlat=-1; }
+    else if (hoverOrb >= 0) { LEVEL.orbs.splice(hoverOrb,1); hoverOrb=-1; }
+    return;
+  }
+
+  if (edTool.startsWith('orb-')) {
+    const shape = edTool.replace('orb-','');
+    const full  = shape==='sq'?'square': shape==='tri'?'triangle': shape==='cir'?'circle': shape;
+    LEVEL.orbs.push({ x:snap(pos.x), y:snap(pos.y), shape:full });
+    return;
+  }
+
+  if (edTool === 'door') {
+    LEVEL.doorPos = { x:snap(pos.x)-15, y:snap(pos.y)-19 };
+    return;
+  }
+
+  if (edTool === 'start') {
+    LEVEL.playerStart = { x:snap(pos.x), y:snap(pos.y) };
+    return;
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (appMode !== 'edit') return;
+
+  // ── Select: drop ──
+  if (edTool === 'select' && selDragging) {
+    selDragging = false;
+    canvas.style.cursor = (selType) ? 'grab' : 'default';
+    // Keep selection active so user can see what they moved
+    return;
+  }
+
+  if (edTool === 'platform' && dragStart) {
+    const pos = canvasXY(e);
+    const sx=snap(Math.min(dragStart.x,pos.x)), sy=snap(Math.min(dragStart.y,pos.y));
+    const ex=snap(Math.max(dragStart.x,pos.x)), ey=snap(Math.max(dragStart.y,pos.y));
+    const w=Math.max(4,ex-sx), h=Math.max(4,ey-sy);
+    if (w>4 || h>4) LEVEL.platforms.push({x:sx,y:sy,w,h});
+    dragStart=null; dragRect=null;
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoverPlat=-1; hoverOrb=-1; hoverDoor=false; hoverStart=false;
+  if (!selDragging) canvas.style.cursor = edTool==='select' ? 'default' : edTool==='delete' ? 'not-allowed' : 'crosshair';
+});
+
+// ─── CONTEXT MENU ────────────────────────────────────────────────────────────
+let ctxTarget = null; // { type, idx } — what was right-clicked
+
+const ctxMenu = document.getElementById('ctx-menu');
+
+function showCtxMenu(x, y, type, idx) {
+  ctxTarget = { type, idx };
+  const labels = { plat:'PLATFORM', orb:'ORB', door:'DOOR', start:'PLAYER START' };
+  document.getElementById('ctx-title').textContent = labels[type] || type.toUpperCase();
+  // Duplicate not available for door/start
+  document.getElementById('ctx-dup').style.display = (type==='door'||type==='start') ? 'none' : 'flex';
+  // Relabel delete for start
+  document.getElementById('ctx-del').innerHTML = type==='start' ? '↺ &nbsp;Reset position' : '✕ &nbsp;Delete';
+
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top  = y + 'px';
+  ctxMenu.classList.add('visible');
+}
+
+function hideCtxMenu() {
+  ctxMenu.classList.remove('visible');
+  ctxTarget = null;
+}
+
+function ctxDuplicate() {
+  if (!ctxTarget) return;
+  if (ctxTarget.type === 'plat') {
+    const p = LEVEL.platforms[ctxTarget.idx];
+    const copy = { x: p.x + 12, y: p.y + 12, w: p.w, h: p.h };
+    LEVEL.platforms.push(copy);
+    // Select the new copy
+    selType = 'plat'; selIdx = LEVEL.platforms.length - 1;
+  } else if (ctxTarget.type === 'orb') {
+    const o = LEVEL.orbs[ctxTarget.idx];
+    const copy = { x: o.x + 14, y: o.y + 14, shape: o.shape };
+    LEVEL.orbs.push(copy);
+    selType = 'orb'; selIdx = LEVEL.orbs.length - 1;
+  }
+  hideCtxMenu();
+}
+
+function ctxDelete() {
+  if (!ctxTarget) return;
+  if (ctxTarget.type === 'plat') {
+    LEVEL.platforms.splice(ctxTarget.idx, 1);
+    selType = null; selIdx = -1;
+  } else if (ctxTarget.type === 'orb') {
+    LEVEL.orbs.splice(ctxTarget.idx, 1);
+    selType = null; selIdx = -1;
+  } else if (ctxTarget.type === 'start') {
+    LEVEL.playerStart = { x: 40, y: 415 }; // reset to default
+  }
+  hideCtxMenu();
+}
+
+// Right-click on canvas
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (appMode !== 'edit' || edTool !== 'select') return;
+
+  const pos = canvasXY(e);
+  updateHover(pos);
+
+  // Find what was right-clicked — check in same priority order as selection
+  if (hoverDoor) {
+    showCtxMenu(e.clientX, e.clientY, 'door', -1);
+  } else if (hoverStart) {
+    showCtxMenu(e.clientX, e.clientY, 'start', -1);
+  } else if (hoverOrb >= 0) {
+    selType = 'orb'; selIdx = hoverOrb;
+    showCtxMenu(e.clientX, e.clientY, 'orb', hoverOrb);
+  } else if (hoverPlat >= 0) {
+    selType = 'plat'; selIdx = hoverPlat;
+    showCtxMenu(e.clientX, e.clientY, 'plat', hoverPlat);
+  }
+  // Nothing under cursor — do nothing
+});
+
+// Dismiss context menu on any click elsewhere
+document.addEventListener('mousedown', e => {
+  if (!ctxMenu.classList.contains('visible')) return;
+  if (!ctxMenu.contains(e.target)) hideCtxMenu();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Escape') hideCtxMenu();
+}, true);
+
+// ─── EDITOR DRAW ─────────────────────────────────────────────────────────────
+function drawEditor() {
+  ctx.clearRect(0,0,W,H);
+
+  // Background
+  ctx.fillStyle = C.bg; ctx.fillRect(0,0,W,H);
+
+  // Tunnel tint
+  ctx.fillStyle='#e8e4df'; ctx.fillRect(0,0,W,TUNNEL_H);
+
+  // Grid
+  if (edGrid) {
+    ctx.save(); ctx.strokeStyle='#ddd'; ctx.lineWidth=0.5;
+    for (let x=0;x<W;x+=edGridSize) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y=0;y<H;y+=edGridSize) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // Platforms
+  for (let i=0; i<LEVEL.platforms.length; i++) {
+    const p=LEVEL.platforms[i];
+    const isHov = (edTool==='delete' && hoverPlat===i);
+    const isSel = (edTool==='select' && selType==='plat' && selIdx===i);
+    ctx.save();
+    if (isHov) { ctx.fillStyle='#e63030'; ctx.globalAlpha=0.85; }
+    else { ctx.fillStyle=C.plat; }
+    ctx.fillRect(p.x,p.y,p.w,p.h);
+    if (isSel) {
+      ctx.strokeStyle='#2a6496'; ctx.lineWidth=2; ctx.setLineDash([4,3]);
+      ctx.globalAlpha=1; ctx.strokeRect(p.x-2,p.y-2,p.w+4,p.h+4);
+      // position readout
+      ctx.setLineDash([]); ctx.fillStyle='#2a6496'; ctx.font='8px DM Mono'; ctx.textAlign='left';
+      ctx.fillText(`${p.x},${p.y}  ${p.w}×${p.h}`, p.x, p.y-4);
+    }
+    // Hover highlight in select mode
+    if (edTool==='select' && hoverPlat===i && !selDragging && selType!=='plat') {
+      ctx.strokeStyle='rgba(42,100,150,0.5)'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+      ctx.globalAlpha=1; ctx.strokeRect(p.x-1,p.y-1,p.w+2,p.h+2);
+    }
+    ctx.restore();
+  }
+
+  // Live drag rectangle
+  if (dragRect) {
+    ctx.save();
+    ctx.fillStyle='rgba(17,17,17,0.25)';
+    ctx.strokeStyle='#111'; ctx.lineWidth=1.5;
+    ctx.fillRect(dragRect.x,dragRect.y,dragRect.w,dragRect.h);
+    ctx.strokeRect(dragRect.x,dragRect.y,dragRect.w,dragRect.h);
+    ctx.restore();
+    // Size label
+    ctx.save();
+    ctx.fillStyle='#111'; ctx.font='9px DM Mono'; ctx.textAlign='left';
+    ctx.fillText(`${dragRect.w}×${dragRect.h}`, dragRect.x+2, dragRect.y-3);
+    ctx.restore();
+  }
+
+  // Orbs
+  for (let i=0; i<LEVEL.orbs.length; i++) {
+    const o=LEVEL.orbs[i];
+    const col = o.shape==='triangle'?C.tri: o.shape==='circle'?C.circ: C.sq;
+    const isHov = (edTool==='delete' && hoverOrb===i);
+    const isSel = (edTool==='select' && selType==='orb' && selIdx===i);
+    const isSelHov = (edTool==='select' && hoverOrb===i && !selDragging);
+    ctx.save();
+    if (isHov) { ctx.globalAlpha=0.5; }
+    drawShapeAt(o.shape, o.x, o.y, 17, '#fff', col);
+    if (isSel || isSelHov) {
+      ctx.strokeStyle='#2a6496'; ctx.lineWidth=isSel?2:1.5;
+      ctx.setLineDash([3,3]); ctx.globalAlpha=isSel?1:0.6;
+      ctx.beginPath(); ctx.arc(o.x, o.y, 16, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle=col; ctx.font='8px DM Mono'; ctx.textAlign='center';
+    ctx.fillText(o.shape.toUpperCase(), o.x, o.y-14);
+    ctx.restore();
+  }
+
+  // Door
+  if (LEVEL.doorPos) {
+    const d=LEVEL.doorPos, dw=30, dh=38;
+    const col='#e63030';
+    const isHov=(edTool==='delete' && hoverDoor);
+    const isSel=(edTool==='select' && selType==='door');
+    const isSelHov=(edTool==='select' && hoverDoor && !selDragging);
+    ctx.save();
+    if (isHov) ctx.globalAlpha=0.5;
+    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.fillStyle='rgba(255,220,220,0.4)';
+    ctx.fillRect(d.x,d.y,dw,dh); ctx.strokeRect(d.x,d.y,dw,dh);
+    drawShapeAt(LEVEL.doorShape, d.x+dw/2, d.y+dh/2, Math.min(dw,dh)*0.55, 'transparent', col);
+    if (isSel || isSelHov) {
+      ctx.strokeStyle='#2a6496'; ctx.lineWidth=isSel?2:1.5;
+      ctx.setLineDash([4,3]); ctx.globalAlpha=isSel?1:0.6;
+      ctx.strokeRect(d.x-3,d.y-3,dw+6,dh+6);
+    }
+    ctx.restore();
+    ctx.fillStyle=col; ctx.font='8px DM Mono'; ctx.textAlign='center';
+    ctx.fillText('DOOR', d.x+dw/2, d.y+dh+12);
+  }
+
+  // Player start
+  if (LEVEL.playerStart) {
+    const sp=LEVEL.playerStart;
+    const col = LEVEL.playerShape==='triangle'?C.tri: LEVEL.playerShape==='circle'?C.circ: C.sq;
+    const isSel=(edTool==='select' && selType==='start');
+    const isSelHov=(edTool==='select' && hoverStart && !selDragging);
+    ctx.save();
+    ctx.setLineDash([3,3]); ctx.strokeStyle=col; ctx.lineWidth=1.5;
+    ctx.strokeRect(sp.x-1, sp.y-1, 26, 26);
+    if (isSel || isSelHov) {
+      ctx.strokeStyle='#2a6496'; ctx.lineWidth=isSel?2:1.5;
+      ctx.setLineDash([4,3]); ctx.globalAlpha=isSel?1:0.6;
+      ctx.strokeRect(sp.x-4,sp.y-4,32,32);
+    }
+    ctx.restore();
+    drawShapeAt(LEVEL.playerShape, sp.x+12, sp.y+12, 20, 'rgba(255,255,255,0.7)', col);
+    ctx.fillStyle=col; ctx.font='8px DM Mono'; ctx.textAlign='center';
+    ctx.fillText('START', sp.x+12, sp.y+30);
+  }
+
+  // Cursor crosshair hint in editor
+  ctx.save();
+  ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1; ctx.setLineDash([2,4]);
+  ctx.beginPath(); ctx.moveTo(mousePos.x,0); ctx.lineTo(mousePos.x,H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,mousePos.y); ctx.lineTo(W,mousePos.y); ctx.stroke();
+  // coords
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.font='8px DM Mono'; ctx.textAlign='left'; ctx.setLineDash([]);
+  ctx.fillText(`${snap(mousePos.x)},${snap(mousePos.y)}`, mousePos.x+4, mousePos.y-3);
+  ctx.restore();
+
+  // Borders
+  ctx.fillStyle='#e63030'; // red border in edit mode
+  ctx.fillRect(0,0,2,H); ctx.fillRect(W-2,0,2,H); ctx.fillRect(0,H-2,W,2);
+}
+
+// ─── GAME DRAW ────────────────────────────────────────────────────────────────
+function drawShapeAt(shape,cx,cy,size,fill,stroke,alpha) {
+  ctx.save();
+  if (alpha!==undefined) ctx.globalAlpha=alpha;
+  ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=2.2; ctx.lineJoin='round';
+  if (shape==='square') {
+    ctx.beginPath(); ctx.rect(cx-size/2,cy-size/2,size,size); ctx.fill(); ctx.stroke();
+  } else if (shape==='triangle') {
+    const top=cy-size/2, bottom=cy+size/2;
+    ctx.beginPath(); ctx.moveTo(cx,top); ctx.lineTo(cx+size*0.5,bottom); ctx.lineTo(cx-size*0.5,bottom); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(cx,cy,size*0.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawGame() {
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#e8e4df'; ctx.fillRect(0,0,W,TUNNEL_H);
+
+  // Gap markers
+  const gaps=[{cx:315},{cx:702}];
+  for (const g of gaps) {
+    const pulse=0.35+0.25*Math.sin(t*0.08);
+    ctx.save(); ctx.globalAlpha=pulse; ctx.fillStyle='#999';
+    ctx.font='10px DM Mono'; ctx.textAlign='center';
+    ctx.fillText('▼',g.cx,TUNNEL_H-4); ctx.restore();
+  }
+
+  if (player&&player.y<88) {
+    ctx.save(); ctx.globalAlpha=0.4; ctx.fillStyle='#888';
+    ctx.font='9px DM Mono'; ctx.textAlign='center';
+    ctx.fillText('— secret passage —',W/2,12); ctx.restore();
+  }
+
+  // Platforms
+  for (const p of LEVEL.platforms) {
+    ctx.save(); ctx.globalAlpha=0.05; ctx.fillStyle='#000';
+    ctx.fillRect(p.x+3,p.y+4,p.w,p.h); ctx.restore();
+    ctx.fillStyle=C.plat; ctx.fillRect(p.x,p.y,p.w,p.h);
+  }
+
+  // Orbs
+  for (let i=0;i<orbs.length;i++) {
+    const o=orbs[i]; if (o.collected) continue;
+    const bob=Math.sin(t*0.065+i*2.1)*4, oy=o.y+bob;
+    const col=o.shape==='triangle'?C.tri:o.shape==='circle'?C.circ:C.sq;
+    const pulse=0.5+0.5*Math.sin(t*0.1+i);
+    ctx.save(); ctx.globalAlpha=0.1+0.07*pulse; ctx.strokeStyle=col; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(o.x,oy,19+pulse*4,0,Math.PI*2); ctx.stroke(); ctx.restore();
+    drawShapeAt(o.shape,o.x,oy,17,'#fff',col);
+  }
+
+  // Door
+  const match=player&&player.shape===door.shape;
+  const dcx=door.x+door.w/2, dcy=door.y+door.h/2;
+  const pulse2=0.5+0.5*Math.sin(t*0.1);
+  const gA=match?(0.28+0.18*pulse2):(0.12+0.08*pulse2);
+  const gS=match?(10+4*pulse2):(6+2*pulse2);
+  ctx.save(); ctx.shadowColor='#e63030'; ctx.shadowBlur=gS*4; ctx.globalAlpha=gA;
+  ctx.strokeStyle='#e63030'; ctx.lineWidth=gS; ctx.strokeRect(door.x,door.y,door.w,door.h); ctx.restore();
+  ctx.fillStyle=match?'rgba(255,220,220,0.55)':'rgba(255,240,240,0.35)';
+  ctx.fillRect(door.x,door.y,door.w,door.h);
+  ctx.save(); ctx.strokeStyle='#e63030'; ctx.lineWidth=match?2.5:1.8;
+  ctx.shadowColor='#e63030'; ctx.shadowBlur=match?(8+4*pulse2):4;
+  ctx.strokeRect(door.x,door.y,door.w,door.h); ctx.restore();
+  drawShapeAt(door.shape,dcx,dcy,Math.min(door.w,door.h)*0.55,'transparent','#e63030',match?0.9:0.45);
+
+  // Player
+  if (player) {
+    const cx=player.x+player.w/2, cy=player.y+player.h/2;
+    const col=player.shape==='triangle'?C.tri:player.shape==='circle'?C.circ:C.sq;
+    if (player.shape==='circle') {
+      for (let i=0;i<4;i++) {
+        const a=t*0.04+i*1.57;
+        ctx.save(); ctx.globalAlpha=0.15; ctx.fillStyle=col;
+        ctx.beginPath(); ctx.arc(cx+Math.sin(a)*15,cy+Math.cos(a*1.3)*8+9,2.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+      }
+    }
+    if (player.shape==='square'&&player.clinging) {
+      const side=player.clingSide;
+      ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.globalAlpha=0.55+0.45*Math.sin(t*0.22);
+      if (side==='right'||side==='left') {
+        const tx=side==='right'?player.x+player.w+3:player.x-7, dir=side==='right'?1:-1;
+        for (let i=0;i<3;i++) { ctx.beginPath(); ctx.moveTo(tx,player.y+4+i*8); ctx.lineTo(tx+dir*5,player.y+4+i*8); ctx.stroke(); }
+      } else if (side==='top') {
+        for (let i=0;i<3;i++) { ctx.beginPath(); ctx.moveTo(player.x+4+i*8,player.y-7); ctx.lineTo(player.x+4+i*8,player.y-12); ctx.stroke(); }
+      }
+      ctx.restore();
+      ctx.save(); ctx.globalAlpha=0.06+0.04*Math.sin(t*0.15); ctx.fillStyle=col;
+      ctx.fillRect(player.x-3,player.y-3,player.w+6,player.h+6); ctx.restore();
+    }
+    drawShapeAt(player.shape,cx,cy,player.w,'#fff',col);
+  }
+
+  // Borders
+  ctx.fillStyle='#111';
+  ctx.fillRect(0,0,2,H); ctx.fillRect(W-2,0,2,H); ctx.fillRect(0,H-2,W,2);
+
+  // Flash
+  if (flash) {
+    const a=flash.timer/flash.max;
+    ctx.save(); ctx.globalAlpha=a; ctx.fillStyle=flash.good?C.good:C.bad;
+    ctx.font='500 14px DM Mono'; ctx.textAlign='center';
+    ctx.fillText(flash.msg,W/2,30); ctx.restore();
+    flash.timer--; if(flash.timer<=0) flash=null;
+  }
+
+  if (phase==='winning') {
+    const p=Math.max(0,1-phaseT/90);
+    ctx.save(); ctx.globalAlpha=p*0.9; ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); ctx.restore();
+  }
+  if (phase==='dying') {
+    const p=Math.max(0,1-phaseT/55);
+    ctx.save(); ctx.globalAlpha=p*0.55; ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); ctx.restore();
+  }
+}
+
+// ─── INPUT ───────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+
+  // Toggle editor with E
+  if (e.code === 'KeyE') {
+    if (appMode==='play') enterEditMode();
+    else enterPlayMode();
+    return;
+  }
+
+  if (appMode === 'edit') {
+    if (e.code==='KeyG') toggleGrid();
+    if (e.code==='Escape') { selType=null; selIdx=-1; selDragging=false; }
+    if (e.code==='KeyS' && !e.ctrlKey && !e.metaKey) setTool('select');
+    if (e.code==='Delete'||e.code==='Backspace') {
+      // Delete selected item if in select mode
+      if (edTool==='select') {
+        if (selType==='plat' && selIdx>=0) { LEVEL.platforms.splice(selIdx,1); selType=null; selIdx=-1; }
+        else if (selType==='orb' && selIdx>=0) { LEVEL.orbs.splice(selIdx,1); selType=null; selIdx=-1; }
+      } else {
+        if (hoverPlat>=0)  { LEVEL.platforms.splice(hoverPlat,1); hoverPlat=-1; }
+        else if (hoverOrb>=0) { LEVEL.orbs.splice(hoverOrb,1); hoverOrb=-1; }
+      }
+    }
+    return;
+  }
+
+  if (appMode==='play' && phase==='playing') {
+    if ((e.code==='ArrowUp'||e.code==='Space') && !player.clinging) {
+      if (player.shape==='triangle' && player.onGround) { player.vy=JUMP_VY; player.onGround=false; }
+    }
+    if (e.code==='KeyR') load();
+  }
+});
+document.addEventListener('keyup', e => { keys[e.code]=false; });
+
+// ─── LOOP ─────────────────────────────────────────────────────────────────────
+let running = false;
+
+function update() {
+  t++;
+  if (appMode==='edit') return;
+  if (phase==='winning') { phaseT--; if(phaseT<=0) load(); return; }
+  if (phase==='dying')   { phaseT--; if(phaseT<=0) load(); return; }
+  if (phase!=='playing') return;
+  const res=tick();
+  if (res==='fell') { phase='dying'; phaseT=55; setFlash('—',55,false); return; }
+  checkOrbs(); checkDoor();
+}
+
+function draw() {
+  if (appMode==='edit') drawEditor();
+  else drawGame();
+}
+
+function loop() {
+  if (!running) return;
+  update(); draw();
+  requestAnimationFrame(loop);
+}
+
+function startGame() {
+  const ov=document.getElementById('overlay');
+  ov.style.opacity='0'; ov.style.pointerEvents='none';
+  setTimeout(()=>{ ov.style.display='none'; },600);
+  loadLevelsFromStorage();
+  // Always start from the hardcoded Level 1
+  // LEVEL is already set to it at init — just reset it cleanly
+  LEVEL = deepClone(LEVEL);
+  activeLevelIdx = -1;
+  document.getElementById('lvlNum').textContent = '1';
+  load();
+  running=true;
+  loop();
+}
+</script>
+</body>
+</html>
