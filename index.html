@@ -158,6 +158,7 @@
 <!-- Context menu -->
 <div id="ctx-menu">
   <div class="ctx-label" id="ctx-title">PLATFORM</div>
+  <div class="ctx-item" id="ctx-mesh" onclick="ctxToggleMesh()">▦ &nbsp;Toggle mesh</div>
   <div class="ctx-item" id="ctx-dup" onclick="ctxDuplicate()">⧉ &nbsp;Duplicate</div>
   <div class="ctx-item danger" id="ctx-del" onclick="ctxDelete()">✕ &nbsp;Delete</div>
 </div>
@@ -198,7 +199,8 @@
       <div class="tb-section">
         <span class="tb-label">TOOL</span>
         <button class="tb-btn" id="tool-select"       onclick="setTool('select')">↖ SELECT</button>
-        <button class="tb-btn active" id="tool-platform" onclick="setTool('platform')">▬ PLATFORM</button>
+        <button class="tb-btn active" id="tool-platform" onclick="setTool('platform')">▬ SOLID</button>
+        <button class="tb-btn" id="tool-mesh" onclick="setTool('mesh')">▦ MESH</button>
         <button class="tb-btn" id="tool-orb-square"   onclick="setTool('orb-square')">● SQ ORB</button>
         <button class="tb-btn" id="tool-orb-triangle" onclick="setTool('orb-triangle')">● TRI ORB</button>
         <button class="tb-btn" id="tool-orb-circle"   onclick="setTool('orb-circle')">● CIR ORB</button>
@@ -295,22 +297,24 @@ let LEVEL = {
   "doorPos": { "x": 812, "y": 189 },
   "doorShape": "circle",
   "platforms": [
-    { "x": 0,   "y": 0,   "w": 860, "h": 18  },
-    { "x": 0,   "y": 18,  "w": 18,  "h": 88  },
-    { "x": 842, "y": 18,  "w": 18,  "h": 88  },
-    { "x": 0,   "y": 88,  "w": 285, "h": 18  },
-    { "x": 345, "y": 88,  "w": 330, "h": 18  },
-    { "x": 730, "y": 88,  "w": 130, "h": 18  },
-    { "x": 0,   "y": 179, "w": 18,  "h": 285 },
-    { "x": 277, "y": 386, "w": 60,  "h": 14  },
-    { "x": 474, "y": 260, "w": 60,  "h": 14  },
-    { "x": 842, "y": 106, "w": 18,  "h": 394 },
-    { "x": 663, "y": 227, "w": 186, "h": 45  },
-    { "x": 0,   "y": 463, "w": 123, "h": 37  },
-    { "x": 655, "y": 102, "w": 20,  "h": 170 },
-    { "x": 1,   "y": 84,  "w": 17,  "h": 97  },
-    { "x": 786, "y": 486, "w": 60,  "h": 14  },
-    { "x": 728, "y": 486, "w": 60,  "h": 14  }
+    { "x": 0,     "y": 0,   "w": 860, "h": 18  },
+    { "x": 0,     "y": 18,  "w": 18,  "h": 88  },
+    { "x": 842,   "y": 18,  "w": 18,  "h": 88  },
+    { "x": 0,     "y": 88,  "w": 285, "h": 18  },
+    { "x": 345,   "y": 88,  "w": 330, "h": 18  },
+    { "x": 730,   "y": 88,  "w": 130, "h": 18  },
+    { "x": 0,     "y": 179, "w": 18,  "h": 285 },
+    { "x": 277,   "y": 386, "w": 60,  "h": 14  },
+    { "x": 474,   "y": 260, "w": 60,  "h": 14  },
+    { "x": 842,   "y": 106, "w": 18,  "h": 394 },
+    { "x": 663,   "y": 227, "w": 186, "h": 45  },
+    { "x": 0,     "y": 463, "w": 123, "h": 37  },
+    { "x": 655,   "y": 102, "w": 20,  "h": 170 },
+    { "x": 1,     "y": 84,  "w": 17,  "h": 97  },
+    { "x": 786,   "y": 486, "w": 60,  "h": 14  },
+    { "x": 728,   "y": 486, "w": 60,  "h": 14  },
+    { "x": 285.5, "y": 90,  "w": 60,  "h": 14, "mesh": true },
+    { "x": 675.5, "y": 89,  "w": 55,  "h": 15, "mesh": true }
   ],
   "orbs": [
     { "x": 314, "y": 194, "shape": "triangle" },
@@ -410,7 +414,12 @@ function tick() {
   player.x+=player.vx; player.y+=player.vy;
   player.onGround=false;
 
+  const phasing = player.shape === 'circle' && (keys['ShiftLeft'] || keys['ShiftRight']);
+
   for (const p of LEVEL.platforms) {
+    // Circle phases through mesh walls when Shift held
+    if (phasing && p.mesh) continue;
+
     if (player.x<p.x+p.w && player.x+pw>p.x && player.y<p.y+p.h && player.y+ph>p.y) {
       const ol=player.x+pw-p.x, or_=p.x+p.w-player.x;
       const ot=player.y+ph-p.y, ob=p.y+p.h-player.y;
@@ -484,7 +493,6 @@ function snap(v) { return edGrid ? Math.round(v/edGridSize)*edGridSize : v; }
 
 function setTool(t) {
   edTool = t;
-  // Clear selection when switching away from select
   if (t !== 'select') { selType=null; selIdx=-1; selDragging=false; }
   document.querySelectorAll('.tb-btn[id^="tool-"]').forEach(b => b.classList.remove('active'));
   const el = document.getElementById('tool-'+t);
@@ -714,7 +722,7 @@ canvas.addEventListener('mousemove', e => {
   }
 
   // ── Platform draw drag ──
-  if (dragStart && edTool === 'platform') {
+  if (dragStart && (edTool === 'platform' || edTool === 'mesh')) {
     const sx=snap(Math.min(dragStart.x,pos.x)), sy=snap(Math.min(dragStart.y,pos.y));
     const ex=snap(Math.max(dragStart.x,pos.x)), ey=snap(Math.max(dragStart.y,pos.y));
     dragRect = { x:sx, y:sy, w:Math.max(4,ex-sx), h:Math.max(4,ey-sy) };
@@ -760,7 +768,7 @@ canvas.addEventListener('mousedown', e => {
     return;
   }
 
-  if (edTool === 'platform') {
+  if (edTool === 'platform' || edTool === 'mesh') {
     dragStart = { x: snap(pos.x), y: snap(pos.y) };
     dragRect  = null;
     return;
@@ -802,12 +810,16 @@ canvas.addEventListener('mouseup', e => {
     return;
   }
 
-  if (edTool === 'platform' && dragStart) {
+  if ((edTool === 'platform' || edTool === 'mesh') && dragStart) {
     const pos = canvasXY(e);
     const sx=snap(Math.min(dragStart.x,pos.x)), sy=snap(Math.min(dragStart.y,pos.y));
     const ex=snap(Math.max(dragStart.x,pos.x)), ey=snap(Math.max(dragStart.y,pos.y));
     const w=Math.max(4,ex-sx), h=Math.max(4,ey-sy);
-    if (w>4 || h>4) LEVEL.platforms.push({x:sx,y:sy,w,h});
+    if (w>4 || h>4) {
+      const plat = {x:sx,y:sy,w,h};
+      if (edTool === 'mesh') plat.mesh = true;
+      LEVEL.platforms.push(plat);
+    }
     dragStart=null; dragRect=null;
   }
 });
@@ -826,11 +838,19 @@ function showCtxMenu(x, y, type, idx) {
   ctxTarget = { type, idx };
   const labels = { plat:'PLATFORM', orb:'ORB', door:'DOOR', start:'PLAYER START' };
   document.getElementById('ctx-title').textContent = labels[type] || type.toUpperCase();
+  // Mesh toggle — platforms only
+  const meshBtn = document.getElementById('ctx-mesh');
+  if (type === 'plat') {
+    const isMesh = !!LEVEL.platforms[idx].mesh;
+    meshBtn.innerHTML = isMesh ? '▬ &nbsp;Make solid' : '▦ &nbsp;Make mesh';
+    meshBtn.style.display = 'flex';
+  } else {
+    meshBtn.style.display = 'none';
+  }
   // Duplicate not available for door/start
   document.getElementById('ctx-dup').style.display = (type==='door'||type==='start') ? 'none' : 'flex';
   // Relabel delete for start
   document.getElementById('ctx-del').innerHTML = type==='start' ? '↺ &nbsp;Reset position' : '✕ &nbsp;Delete';
-
   ctxMenu.style.left = x + 'px';
   ctxMenu.style.top  = y + 'px';
   ctxMenu.classList.add('visible');
@@ -841,11 +861,20 @@ function hideCtxMenu() {
   ctxTarget = null;
 }
 
+function ctxToggleMesh() {
+  if (!ctxTarget || ctxTarget.type !== 'plat') return;
+  const p = LEVEL.platforms[ctxTarget.idx];
+  p.mesh = !p.mesh;
+  if (!p.mesh) delete p.mesh;
+  hideCtxMenu();
+}
+
 function ctxDuplicate() {
   if (!ctxTarget) return;
   if (ctxTarget.type === 'plat') {
     const p = LEVEL.platforms[ctxTarget.idx];
     const copy = { x: p.x + 12, y: p.y + 12, w: p.w, h: p.h };
+    if (p.mesh) copy.mesh = true;
     LEVEL.platforms.push(copy);
     // Select the new copy
     selType = 'plat'; selIdx = LEVEL.platforms.length - 1;
@@ -905,6 +934,31 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Escape') hideCtxMenu();
 }, true);
 
+// ─── DRAW BARS (mesh wall) ────────────────────────────────────────────────────
+// Draws vertical black bars with white gaps, clipped to the platform rect.
+function drawBars(x, y, w, h) {
+  const BAR_W   = 5;   // width of each black bar
+  const GAP_W   = 5;   // width of gap between bars
+  const STEP    = BAR_W + GAP_W;
+
+  ctx.save();
+  // Clip to platform bounds so bars don't bleed outside
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  // White/light background between bars
+  ctx.fillStyle = '#e8e8e8';
+  ctx.fillRect(x, y, w, h);
+
+  // Black bars
+  ctx.fillStyle = '#111';
+  for (let bx = x; bx < x + w; bx += STEP) {
+    ctx.fillRect(bx, y, BAR_W, h);
+  }
+  ctx.restore();
+}
+
 // ─── EDITOR DRAW ─────────────────────────────────────────────────────────────
 function drawEditor() {
   ctx.clearRect(0,0,W,H);
@@ -929,17 +983,22 @@ function drawEditor() {
     const isHov = (edTool==='delete' && hoverPlat===i);
     const isSel = (edTool==='select' && selType==='plat' && selIdx===i);
     ctx.save();
-    if (isHov) { ctx.fillStyle='#e63030'; ctx.globalAlpha=0.85; }
-    else { ctx.fillStyle=C.plat; }
-    ctx.fillRect(p.x,p.y,p.w,p.h);
-    if (isSel) {
-      ctx.strokeStyle='#2a6496'; ctx.lineWidth=2; ctx.setLineDash([4,3]);
-      ctx.globalAlpha=1; ctx.strokeRect(p.x-2,p.y-2,p.w+4,p.h+4);
-      // position readout
-      ctx.setLineDash([]); ctx.fillStyle='#2a6496'; ctx.font='8px DM Mono'; ctx.textAlign='left';
-      ctx.fillText(`${p.x},${p.y}  ${p.w}×${p.h}`, p.x, p.y-4);
+    if (p.mesh) {
+      ctx.save();
+      ctx.globalAlpha = isHov ? 0.5 : 1;
+      drawBars(p.x, p.y, p.w, p.h);
+      ctx.restore();
+    } else {
+      if (isHov) { ctx.fillStyle='#e63030'; ctx.globalAlpha=0.85; }
+      else { ctx.fillStyle=C.plat; }
+      ctx.fillRect(p.x,p.y,p.w,p.h);
     }
-    // Hover highlight in select mode
+    if (isSel) {
+      ctx.setLineDash([4,3]); ctx.strokeStyle='#2a6496'; ctx.lineWidth=2;
+      ctx.globalAlpha=1; ctx.strokeRect(p.x-2,p.y-2,p.w+4,p.h+4);
+      ctx.setLineDash([]); ctx.fillStyle='#2a6496'; ctx.font='8px DM Mono'; ctx.textAlign='left';
+      ctx.fillText(`${p.x},${p.y}  ${p.w}×${p.h}${p.mesh?' [mesh]':''}`, p.x, p.y-4);
+    }
     if (edTool==='select' && hoverPlat===i && !selDragging && selType!=='plat') {
       ctx.strokeStyle='rgba(42,100,150,0.5)'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
       ctx.globalAlpha=1; ctx.strokeRect(p.x-1,p.y-1,p.w+2,p.h+2);
@@ -949,15 +1008,18 @@ function drawEditor() {
 
   // Live drag rectangle
   if (dragRect) {
+    const isMeshDrag = edTool === 'mesh';
     ctx.save();
-    ctx.fillStyle='rgba(17,17,17,0.25)';
-    ctx.strokeStyle='#111'; ctx.lineWidth=1.5;
+    ctx.fillStyle = isMeshDrag ? 'rgba(42,100,150,0.15)' : 'rgba(17,17,17,0.25)';
+    ctx.strokeStyle = isMeshDrag ? '#2a6496' : '#111';
+    ctx.lineWidth=1.5;
+    if (isMeshDrag) ctx.setLineDash([5,4]);
     ctx.fillRect(dragRect.x,dragRect.y,dragRect.w,dragRect.h);
     ctx.strokeRect(dragRect.x,dragRect.y,dragRect.w,dragRect.h);
     ctx.restore();
-    // Size label
     ctx.save();
-    ctx.fillStyle='#111'; ctx.font='9px DM Mono'; ctx.textAlign='left';
+    ctx.fillStyle = isMeshDrag ? '#2a6496' : '#111';
+    ctx.font='9px DM Mono'; ctx.textAlign='left';
     ctx.fillText(`${dragRect.w}×${dragRect.h}`, dragRect.x+2, dragRect.y-3);
     ctx.restore();
   }
@@ -1078,10 +1140,38 @@ function drawGame() {
   }
 
   // Platforms
+  const phasing = player && player.shape==='circle' && (keys['ShiftLeft']||keys['ShiftRight']);
   for (const p of LEVEL.platforms) {
-    ctx.save(); ctx.globalAlpha=0.05; ctx.fillStyle='#000';
-    ctx.fillRect(p.x+3,p.y+4,p.w,p.h); ctx.restore();
-    ctx.fillStyle=C.plat; ctx.fillRect(p.x,p.y,p.w,p.h);
+    if (p.mesh) {
+      const isPhasingThrough = phasing &&
+        player.x < p.x+p.w && player.x+player.w > p.x &&
+        player.y < p.y+p.h && player.y+player.h > p.y;
+      const meshPulse = 0.5 + 0.5 * Math.sin(t * 0.12);
+      ctx.save();
+      ctx.globalAlpha = isPhasingThrough ? 0.15 + 0.1 * meshPulse : 1;
+      drawBars(p.x, p.y, p.w, p.h);
+      ctx.restore();
+    } else {
+      ctx.save(); ctx.globalAlpha=0.05; ctx.fillStyle='#000';
+      ctx.fillRect(p.x+3,p.y+4,p.w,p.h); ctx.restore();
+      ctx.fillStyle=C.plat; ctx.fillRect(p.x,p.y,p.w,p.h);
+    }
+  }
+
+  // Phasing aura on Circle when Shift held
+  if (phasing && player) {
+    const cx = player.x + player.w/2, cy = player.y + player.h/2;
+    const aura = 0.3 + 0.2 * Math.sin(t * 0.15);
+    ctx.save();
+    ctx.globalAlpha = aura;
+    ctx.strokeStyle = C.circ;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.arc(cx, cy, player.w * 0.7, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = aura * 0.4;
+    ctx.beginPath(); ctx.arc(cx, cy, player.w * 0.9, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
   }
 
   // Orbs
@@ -1164,7 +1254,7 @@ function drawGame() {
 // ─── INPUT ───────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight'].includes(e.code)) e.preventDefault();
 
   // Toggle editor with E
   if (e.code === 'KeyE') {
@@ -1191,7 +1281,7 @@ document.addEventListener('keydown', e => {
   }
 
   if (appMode==='play' && phase==='playing') {
-    if ((e.code==='ArrowUp'||e.code==='Space') && !player.clinging) {
+    if ((e.code==='ShiftLeft'||e.code==='ShiftRight') && !player.clinging) {
       if (player.shape==='triangle' && player.onGround) { player.vy=JUMP_VY; player.onGround=false; }
     }
     if (e.code==='KeyR') load();
