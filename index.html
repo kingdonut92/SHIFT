@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta charset="UTF-8">
 <title>SHIFT</title>
 <style>
@@ -129,6 +130,74 @@
   }
   #new-level-btn:hover { border-color: #111; color: #111; }
 
+  #save-toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    background: #111; color: #f0ede8;
+    font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.15em;
+    padding: 9px 20px; pointer-events: none;
+    opacity: 0; transition: opacity 0.2s;
+    z-index: 500;
+  }
+  #save-toast.show { opacity: 1; }
+
+  /* ── Mobile ── */
+  #mobile-controls {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 140px;
+    background: #111;
+    border-top: 2px solid #111;
+    z-index: 50;
+    touch-action: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+  }
+
+  /* D-pad cross using CSS grid */
+  .dpad {
+    display: grid;
+    grid-template-columns: 44px 44px 44px;
+    grid-template-rows:    44px 44px 44px;
+    gap: 4px;
+  }
+
+  .mc-btn {
+    background: #fff; color: #111;
+    border: none; border-radius: 6px;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none; line-height: 1;
+  }
+  .mc-btn:active, .mc-btn.pressed { background: #ccc; }
+
+  /* grid positions for cross shape */
+  #mb-up    { grid-column: 2; grid-row: 1; }
+  #mb-left  { grid-column: 1; grid-row: 2; }
+  #mb-right { grid-column: 3; grid-row: 2; }
+  #mb-down  { grid-column: 2; grid-row: 3; }
+  .dpad-centre { grid-column: 2; grid-row: 2; background: transparent; }
+
+  /* SHIFT button */
+  #mb-shift {
+    width: 76px; height: 76px;
+    border-radius: 50%;
+    background: #e63030; color: #fff;
+    border: none; font-family: 'Bebas Neue', sans-serif;
+    font-size: 15px; letter-spacing: 0.15em;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+    user-select: none; cursor: pointer;
+  }
+  #mb-shift:active, #mb-shift.pressed { background: #b02020; }
+
+  @media (max-width: 900px) {
+    body { justify-content: flex-start; overflow: hidden; background: #111; }
+    #mobile-controls { display: flex; }
+  }
+
   /* ── Context menu ── */
   #ctx-menu {
     position: fixed; display: none;
@@ -161,6 +230,24 @@
   <div class="ctx-item" id="ctx-mesh" onclick="ctxToggleMesh()">▦ &nbsp;Toggle mesh</div>
   <div class="ctx-item" id="ctx-dup" onclick="ctxDuplicate()">⧉ &nbsp;Duplicate</div>
   <div class="ctx-item danger" id="ctx-del" onclick="ctxDelete()">✕ &nbsp;Delete</div>
+</div>
+
+<!-- Save toast -->
+<div id="save-toast">PROGRESS SAVED</div>
+
+<!-- Mobile touch controls -->
+<div id="mobile-controls">
+  <!-- D-pad cross -->
+  <div class="dpad">
+    <button class="mc-btn" id="mb-up">↑</button>
+    <button class="mc-btn" id="mb-left">←</button>
+    <div class="dpad-centre"></div>
+    <button class="mc-btn" id="mb-right">→</button>
+    <button class="mc-btn" id="mb-down">↓</button>
+  </div>
+
+  <!-- SHIFT ability button -->
+  <button id="mb-shift">SHIFT</button>
 </div>
 
 <div id="overlay" onclick="startGame()">
@@ -227,7 +314,6 @@
         <button class="tb-btn" id="grid-btn" onclick="toggleGrid()">OFF</button>
       </div>
       <div class="tb-section" style="margin-left:auto">
-        <button class="tb-btn" onclick="clearLevel()" style="color:#e63030">✕ CLEAR</button>
         <button class="tb-btn" onclick="testLevel()" style="color:#2d8a45">▶ TEST</button>
         <button class="tb-btn" onclick="saveLevel()" style="color:#2a6496">↓ SAVE</button>
         <button class="tb-btn" onclick="exportLevel()" style="color:#888">{ } EXPORT</button>
@@ -264,7 +350,6 @@ const GRAVITY     = 0.52;
 const JUMP_VY     = -13;
 const SPEED       = 4.4;
 const CLING_SPEED = 3.0;
-const FLOAT_FORCE = -0.38;
 const TUNNEL_H    = 106;
 
 // ─── COLORS ──────────────────────────────────────────────────────────────────
@@ -289,41 +374,85 @@ function saveLevelsToStorage() {
   localStorage.setItem('shift_levels', JSON.stringify(savedLevels));
 }
 
-// ─── LEVEL 1 (hardcoded) ─────────────────────────────────────────────────────
-let LEVEL = {
-  "name": "Level 1",
-  "playerStart": { "x": 46, "y": 431 },
-  "playerShape": "square",
-  "doorPos": { "x": 812, "y": 189 },
-  "doorShape": "circle",
-  "platforms": [
-    { "x": 0,     "y": 0,   "w": 860, "h": 18  },
-    { "x": 0,     "y": 18,  "w": 18,  "h": 88  },
-    { "x": 842,   "y": 18,  "w": 18,  "h": 88  },
-    { "x": 0,     "y": 88,  "w": 285, "h": 18  },
-    { "x": 345,   "y": 88,  "w": 330, "h": 18  },
-    { "x": 730,   "y": 88,  "w": 130, "h": 18  },
-    { "x": 0,     "y": 179, "w": 18,  "h": 285 },
-    { "x": 277,   "y": 386, "w": 60,  "h": 14  },
-    { "x": 474,   "y": 260, "w": 60,  "h": 14  },
-    { "x": 842,   "y": 106, "w": 18,  "h": 394 },
-    { "x": 663,   "y": 227, "w": 186, "h": 45  },
-    { "x": 0,     "y": 463, "w": 123, "h": 37  },
-    { "x": 655,   "y": 102, "w": 20,  "h": 170 },
-    { "x": 1,     "y": 84,  "w": 17,  "h": 97  },
-    { "x": 786,   "y": 486, "w": 60,  "h": 14  },
-    { "x": 728,   "y": 486, "w": 60,  "h": 14  },
-    { "x": 285.5, "y": 90,  "w": 60,  "h": 14, "mesh": true },
-    { "x": 675.5, "y": 89,  "w": 55,  "h": 15, "mesh": true }
-  ],
-  "orbs": [
-    { "x": 314, "y": 194, "shape": "triangle" },
-    { "x": 790, "y": 461, "shape": "circle"   },
-    { "x": 635, "y": 135, "shape": "square"   }
-  ]
-};
-
 function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+// ─── HARDCODED LEVELS ────────────────────────────────────────────────────────
+const HARDCODED_LEVELS = [
+  {
+    "name": "Level 1",
+    "playerStart": { "x": 50, "y": 415 },
+    "playerShape": "triangle",
+    "doorPos": { "x": 830, "y": 0 },
+    "doorShape": "triangle",
+    "platforms": [
+      { "x": 2,   "y": 480.5, "w": 856, "h": 18  },
+      { "x": 0,   "y": 17,    "w": 19,  "h": 480 },
+      { "x": 0,   "y": 0,     "w": 830, "h": 19  },
+      { "x": 806, "y": 18.5,  "w": 23,  "h": 65  },
+      { "x": 707, "y": 136.5, "w": 152, "h": 12  },
+      { "x": 158, "y": 425.5, "w": 102, "h": 9   }
+    ],
+    "orbs": [
+      { "x": 393, "y": 267.5, "shape": "square"   },
+      { "x": 755, "y": 113.5, "shape": "triangle" }
+    ]
+  },
+  {
+    "name": "Level 2",
+    "playerStart": { "x": 50, "y": 415 },
+    "playerShape": "square",
+    "doorPos": { "x": 400, "y": 200 },
+    "doorShape": "circle",
+    "platforms": [
+      { "x": 328,   "y": 136.5, "w": 19,  "h": 157, "mesh": true },
+      { "x": 346,   "y": 272.5, "w": 132, "h": 21,  "mesh": true },
+      { "x": 477,   "y": 142.5, "w": 15,  "h": 149, "mesh": true },
+      { "x": 329,   "y": 125.5, "w": 162, "h": 17,  "mesh": true },
+      { "x": 10,    "y": 449.5, "w": 417, "h": 11   },
+      { "x": 403,   "y": 294.5, "w": 23,  "h": 166  },
+      { "x": 425,   "y": 365,   "w": 110, "h": 14   },
+      { "x": 633,   "y": 221,   "w": 115, "h": 10   }
+    ],
+    "orbs": [
+      { "x": 469, "y": 336, "shape": "triangle" },
+      { "x": 176, "y": 217, "shape": "circle"   }
+    ]
+  },
+  {
+    "name": "Level 3",
+    "playerStart": { "x": 46, "y": 431 },
+    "playerShape": "square",
+    "doorPos": { "x": 812, "y": 189 },
+    "doorShape": "circle",
+    "platforms": [
+      { "x": 0,     "y": 0,   "w": 860, "h": 18  },
+      { "x": 842,   "y": 18,  "w": 18,  "h": 88  },
+      { "x": 0,     "y": 88,  "w": 285, "h": 18  },
+      { "x": 345,   "y": 88,  "w": 330, "h": 18  },
+      { "x": 730,   "y": 88,  "w": 130, "h": 18  },
+      { "x": 277,   "y": 386, "w": 60,  "h": 14  },
+      { "x": 474,   "y": 260, "w": 60,  "h": 14  },
+      { "x": 842,   "y": 106, "w": 18,  "h": 394 },
+      { "x": 663,   "y": 227, "w": 186, "h": 45  },
+      { "x": 0,     "y": 463, "w": 123, "h": 37  },
+      { "x": 655,   "y": 102, "w": 20,  "h": 170 },
+      { "x": 786,   "y": 486, "w": 60,  "h": 14  },
+      { "x": 728,   "y": 486, "w": 60,  "h": 14  },
+      { "x": 285.5, "y": 90,  "w": 60,  "h": 14, "mesh": true },
+      { "x": 675.5, "y": 89,  "w": 55,  "h": 15, "mesh": true },
+      { "x": 0,     "y": 104, "w": 20,  "h": 382 },
+      { "x": 2,     "y": 8,   "w": 17,  "h": 82  }
+    ],
+    "orbs": [
+      { "x": 314, "y": 194, "shape": "triangle" },
+      { "x": 790, "y": 461, "shape": "circle"   },
+      { "x": 635, "y": 135, "shape": "square"   }
+    ]
+  }
+];
+
+let currentLevelIdx = 0;
+let LEVEL = deepClone(HARDCODED_LEVELS[0]);
 
 // ─── GAME STATE ──────────────────────────────────────────────────────────────
 let player, orbs, door;
@@ -385,18 +514,25 @@ function tick() {
       if (keys['ArrowDown']||keys['KeyS']) player.vy= CLING_SPEED;
       const p=LEVEL.platforms[newPlatIdx];
       if (side==='right') player.x=p.x-pw; else player.x=p.x+p.w;
+      // Apply movement then clamp Y so player can't slide past platform ends
+      player.y+=player.vy;
+      player.y = Math.max(p.y, Math.min(p.y + p.h - ph, player.y));
+      player.x=Math.max(0,Math.min(W-pw,player.x));
+      if (player.y>H+80) return 'fell';
+      return null;
     }
     if (side==='top') {
       if (keys['ArrowLeft'] ||keys['KeyA']) player.vx=-CLING_SPEED;
       if (keys['ArrowRight']||keys['KeyD']) player.vx= CLING_SPEED;
       const p=LEVEL.platforms[newPlatIdx];
       player.y=p.y+p.h;
+      // Clamp X to platform width
+      player.x+=player.vx;
+      player.x = Math.max(p.x, Math.min(p.x + p.w - pw, player.x));
+      player.x=Math.max(0,Math.min(W-pw,player.x));
+      if (player.y>H+80) return 'fell';
+      return null;
     }
-    player.x+=player.vx; player.y+=player.vy;
-    player.x=Math.max(0,Math.min(W-pw,player.x));
-    player.y=Math.max(0,Math.min(H-ph,player.y));
-    if (player.y>H+80) return 'fell';
-    return null;
   }
 
   player.vx=0;
@@ -404,10 +540,10 @@ function tick() {
   if (keys['ArrowRight']||keys['KeyD']) player.vx= SPEED;
 
   if (player.shape==='circle') {
-    let f=FLOAT_FORCE;
-    if (keys['ArrowDown']||keys['KeyS']) f= 0.52;
-    if (keys['ArrowUp']  ||keys['KeyW']) f=-0.58;
-    player.vy+=f; player.vy*=0.85;
+    // Full directional control — no auto-float
+    player.vy = 0;
+    if (keys['ArrowUp']  ||keys['KeyW']) player.vy = -SPEED;
+    if (keys['ArrowDown']||keys['KeyS']) player.vy =  SPEED;
   } else { player.vy+=GRAVITY; }
 
   player.vy=Math.max(-16,Math.min(18,player.vy));
@@ -525,10 +661,19 @@ function toggleGrid() {
 }
 
 function clearLevel() {
-  if (!confirm('Clear all platforms, orbs, and door?')) return;
-  LEVEL.platforms = [];
-  LEVEL.orbs      = [];
-  LEVEL.doorPos   = { x:400, y:200 };
+  if (!confirm('Clear everything and start fresh?')) return;
+  LEVEL.platforms   = [];
+  LEVEL.orbs        = [];
+  LEVEL.doorPos     = { x: 400, y: 200 };
+  LEVEL.doorShape   = 'circle';
+  LEVEL.playerStart = { x: 50, y: 415 };
+  LEVEL.playerShape = 'square';
+  // Reset editor state
+  selType = null; selIdx = -1; selDragging = false;
+  hoverPlat = -1; hoverOrb = -1; hoverDoor = false; hoverStart = false;
+  dragStart = null; dragRect = null;
+  setDoorShape('circle');
+  setStartShape('square');
 }
 
 function testLevel() {
@@ -542,19 +687,33 @@ function toggleLevelPanel() {
   if (p.classList.contains('visible')) renderLevelPanel();
 }
 
+let _toastTimer = null;
+function showSaveToast() {
+  const el = document.getElementById('save-toast');
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
 // ─── SAVE / LOAD LEVELS ──────────────────────────────────────────────────────
 function saveLevel() {
-  const num = savedLevels.length + 1;
-  const name = `Level ${num}`;
-  const lv   = deepClone(LEVEL);
-  lv.name    = name;
-  savedLevels.push(lv);
-  saveLevelsToStorage();
-  activeLevelIdx = savedLevels.length - 1;
-  document.getElementById('lvlNum').textContent = activeLevelIdx + 1;
+  const lv = deepClone(LEVEL);
+
+  if (activeLevelIdx >= 0 && activeLevelIdx < savedLevels.length) {
+    lv.name = savedLevels[activeLevelIdx].name;
+    savedLevels[activeLevelIdx] = lv;
+    saveLevelsToStorage();
+  } else {
+    const num = savedLevels.length + 1;
+    lv.name   = `Level ${num}`;
+    savedLevels.push(lv);
+    activeLevelIdx = savedLevels.length - 1;
+    document.getElementById('lvlNum').textContent = activeLevelIdx + 1;
+    saveLevelsToStorage();
+  }
+
   renderLevelPanel();
-  document.getElementById('level-panel').classList.add('visible');
-  setFlash('SAVED: ' + name, 80, true);
+  showSaveToast();
 }
 
 function exportLevel() {
@@ -579,11 +738,12 @@ function closeExport() {
 }
 
 function newLevel() {
+  // Don't touch the current LEVEL — just switch to a blank working state
   LEVEL = {
     name: 'New Level',
-    playerStart: { x:50, y:415 },
+    playerStart: { x: 50, y: 415 },
     playerShape: 'square',
-    doorPos:     { x:400, y:200 },
+    doorPos:     { x: 400, y: 200 },
     doorShape:   'circle',
     platforms:   [],
     orbs:        [],
@@ -592,6 +752,9 @@ function newLevel() {
   document.getElementById('lvlNum').textContent = '—';
   setDoorShape('circle');
   setStartShape('square');
+  selType = null; selIdx = -1; selDragging = false;
+  renderLevelPanel();
+  // Keep levels panel open so user sees context
 }
 
 function loadSavedLevel(idx) {
@@ -608,30 +771,21 @@ function renderLevelPanel() {
   panel.innerHTML = '';
 
   savedLevels.forEach((lv, i) => {
-    const idx = i; // capture for closure
     const slot = document.createElement('div');
-    slot.className = 'level-slot' + (activeLevelIdx === idx ? ' active-slot' : '');
+    slot.className = 'level-slot' + (activeLevelIdx === i ? ' active-slot' : '');
+    slot.dataset.idx = i;
 
     const label = document.createElement('span');
     label.textContent = lv.name;
+    label.style.pointerEvents = 'none';
 
     const del = document.createElement('span');
     del.className = 'slot-del';
     del.textContent = '✕';
-    del.addEventListener('click', function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      if (!confirm('Delete ' + savedLevels[idx].name + '?')) return;
-      savedLevels.splice(idx, 1);
-      savedLevels.forEach((l, j) => { l.name = `Level ${j + 1}`; });
-      saveLevelsToStorage();
-      if (activeLevelIdx >= savedLevels.length) activeLevelIdx = savedLevels.length - 1;
-      renderLevelPanel();
-    });
+    del.dataset.del = 'true';
 
     slot.appendChild(label);
     slot.appendChild(del);
-    slot.addEventListener('click', () => loadSavedLevel(idx));
     panel.appendChild(slot);
   });
 
@@ -640,6 +794,35 @@ function renderLevelPanel() {
   nb.textContent = '+ NEW LEVEL';
   nb.onclick = newLevel;
   panel.appendChild(nb);
+
+  // Single delegated listener on the panel
+  panel.onclick = function(e) {
+    const delEl = e.target.closest('[data-del]');
+    const slotEl = e.target.closest('[data-idx]');
+
+    if (delEl) {
+      // Delete this level
+      const i = parseInt(slotEl.dataset.idx);
+      if (!confirm('Delete ' + savedLevels[i].name + '?')) return;
+      savedLevels.splice(i, 1);
+      savedLevels.forEach((l, j) => { l.name = `Level ${j + 1}`; });
+      saveLevelsToStorage();
+      if (activeLevelIdx === i) {
+        activeLevelIdx = -1;
+        document.getElementById('lvlNum').textContent = '—';
+      } else if (activeLevelIdx > i) {
+        activeLevelIdx--;
+        document.getElementById('lvlNum').textContent = activeLevelIdx + 1;
+      }
+      renderLevelPanel();
+      return;
+    }
+
+    if (slotEl) {
+      // Load this level
+      loadSavedLevel(parseInt(slotEl.dataset.idx));
+    }
+  };
 }
 
 // ─── MODE SWITCHING ──────────────────────────────────────────────────────────
@@ -966,9 +1149,6 @@ function drawEditor() {
   // Background
   ctx.fillStyle = C.bg; ctx.fillRect(0,0,W,H);
 
-  // Tunnel tint
-  ctx.fillStyle='#e8e4df'; ctx.fillRect(0,0,W,TUNNEL_H);
-
   // Grid
   if (edGrid) {
     ctx.save(); ctx.strokeStyle='#ddd'; ctx.lineWidth=0.5;
@@ -1122,21 +1302,8 @@ function drawShapeAt(shape,cx,cy,size,fill,stroke,alpha) {
 function drawGame() {
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#e8e4df'; ctx.fillRect(0,0,W,TUNNEL_H);
-
-  // Gap markers
-  const gaps=[{cx:315},{cx:702}];
-  for (const g of gaps) {
-    const pulse=0.35+0.25*Math.sin(t*0.08);
-    ctx.save(); ctx.globalAlpha=pulse; ctx.fillStyle='#999';
-    ctx.font='10px DM Mono'; ctx.textAlign='center';
-    ctx.fillText('▼',g.cx,TUNNEL_H-4); ctx.restore();
-  }
 
   if (player&&player.y<88) {
-    ctx.save(); ctx.globalAlpha=0.4; ctx.fillStyle='#888';
-    ctx.font='9px DM Mono'; ctx.textAlign='center';
-    ctx.fillText('— secret passage —',W/2,12); ctx.restore();
   }
 
   // Platforms
@@ -1289,13 +1456,105 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.code]=false; });
 
+// ─── MOBILE TOUCH CONTROLS ───────────────────────────────────────────────────
+// Each button maps to a key code in the existing keys{} object.
+// Triangle jump fires on touchstart (same as keydown for Shift).
+const BTN_MAP = {
+  'mb-left':  'ArrowLeft',
+  'mb-right': 'ArrowRight',
+  'mb-up':    'ArrowUp',
+  'mb-down':  'ArrowDown',
+  'mb-shift': 'ShiftLeft',
+};
+
+function bindTouchBtn(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const code = BTN_MAP[id];
+
+  el.addEventListener('touchstart', e => {
+    e.preventDefault();
+    keys[code] = true;
+    el.classList.add('pressed');
+    // Triangle jump fires on press, same as keydown
+    if (code === 'ShiftLeft' && appMode === 'play' && phase === 'playing' && player) {
+      if (player.shape === 'triangle' && player.onGround) {
+        player.vy = JUMP_VY;
+        player.onGround = false;
+      }
+    }
+  }, { passive: false });
+
+  el.addEventListener('touchend', e => {
+    e.preventDefault();
+    keys[code] = false;
+    el.classList.remove('pressed');
+  }, { passive: false });
+
+  el.addEventListener('touchcancel', e => {
+    keys[code] = false;
+    el.classList.remove('pressed');
+  });
+}
+
+Object.keys(BTN_MAP).forEach(bindTouchBtn);
+
+// ─── CANVAS SCALE FOR MOBILE ─────────────────────────────────────────────────
+function scaleCanvas() {
+  const wrapper = document.getElementById('wrapper');
+  const isMobile = window.innerWidth < 900;
+
+  if (!isMobile) {
+    wrapper.style.transform    = '';
+    wrapper.style.transformOrigin = '';
+    wrapper.style.position     = '';
+    wrapper.style.left         = '';
+    wrapper.style.top          = '';
+    document.body.style.height = '';
+    return;
+  }
+
+  const controlsH = 140;
+  const availableH = window.innerHeight - controlsH;
+  const availableW = window.innerWidth;
+
+  // Scale to fit width, but don't exceed available height
+  const scaleW = availableW / 860;
+  const scaleH = availableH / 560; // 560 ≈ topbar + canvas + statusbar
+  const scale  = Math.min(scaleW, scaleH);
+
+  const scaledW = 860 * scale;
+  const scaledH = 560 * scale;
+  const offsetX = (availableW - scaledW) / 2;
+  const offsetY = (availableH - scaledH) / 2;
+
+  wrapper.style.transformOrigin = 'top left';
+  wrapper.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  wrapper.style.position  = 'fixed';
+  wrapper.style.left      = '0';
+  wrapper.style.top       = '0';
+}
+
+window.addEventListener('resize', scaleCanvas);
+scaleCanvas();
+
 // ─── LOOP ─────────────────────────────────────────────────────────────────────
 let running = false;
 
 function update() {
   t++;
   if (appMode==='edit') return;
-  if (phase==='winning') { phaseT--; if(phaseT<=0) load(); return; }
+  if (phase==='winning') {
+    phaseT--;
+    if (phaseT <= 0) {
+      // Advance to next hardcoded level, or loop back to 1
+      currentLevelIdx = (currentLevelIdx + 1) % HARDCODED_LEVELS.length;
+      LEVEL = deepClone(HARDCODED_LEVELS[currentLevelIdx]);
+      document.getElementById('lvlNum').textContent = currentLevelIdx + 1;
+      load();
+    }
+    return;
+  }
   if (phase==='dying')   { phaseT--; if(phaseT<=0) load(); return; }
   if (phase!=='playing') return;
   const res=tick();
@@ -1319,9 +1578,8 @@ function startGame() {
   ov.style.opacity='0'; ov.style.pointerEvents='none';
   setTimeout(()=>{ ov.style.display='none'; },600);
   loadLevelsFromStorage();
-  // Always start from the hardcoded Level 1
-  // LEVEL is already set to it at init — just reset it cleanly
-  LEVEL = deepClone(LEVEL);
+  currentLevelIdx = 0;
+  LEVEL = deepClone(HARDCODED_LEVELS[0]);
   activeLevelIdx = -1;
   document.getElementById('lvlNum').textContent = '1';
   load();
