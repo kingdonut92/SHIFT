@@ -193,9 +193,12 @@
   }
   #mb-shift:active, #mb-shift.pressed { background: #b02020; }
 
-  @media (max-width: 900px) {
+  @media (max-width: 600px) {
     body { justify-content: flex-start; overflow: hidden; background: #111; }
     #mobile-controls { display: flex; }
+    .title-sm { color: #fff; }
+    .meta { color: #888; }
+    .meta strong { color: #fff; }
   }
 
   /* ── Context menu ── */
@@ -1502,7 +1505,7 @@ Object.keys(BTN_MAP).forEach(bindTouchBtn);
 // ─── CANVAS SCALE FOR MOBILE ─────────────────────────────────────────────────
 function scaleCanvas() {
   const wrapper = document.getElementById('wrapper');
-  const isMobile = window.innerWidth < 900;
+  const isMobile = window.innerWidth < 600;
 
   if (!isMobile) {
     wrapper.style.transform    = '';
